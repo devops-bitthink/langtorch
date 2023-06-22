@@ -57,13 +57,14 @@ final class PGVectorStoreTest {
                 .setTextKey(textKey)
                 .setDatabaseName("test")
                 .setVectorDimensions(3)
+                .setShouldOverWriteDatabase(true)
                 .build();
 
         pgVectorStore =
                 new PGVectorStore(
                         embeddingProcessor,
                         pgVectorStoreSpec, pgVectorService,
-                        DistanceStrategies.cosine(), true);
+                        DistanceStrategies.cosine());
     }
 
     @Test
@@ -84,7 +85,7 @@ final class PGVectorStoreTest {
         pgVectorStore = new PGVectorStore(
                 embeddingProcessor,
                 pgVectorStoreSpec, pgVectorService,
-                DistanceStrategies.euclidean(), true);
+                DistanceStrategies.euclidean());
 
         Triple<String, String, SimilaritySearchQuery> queryData = prepareSimilaritySearchQuery();
         SimilaritySearchQuery query = queryData.getThird();
@@ -110,7 +111,7 @@ final class PGVectorStoreTest {
         pgVectorStore = new PGVectorStore(
                 embeddingProcessor,
                 pgVectorStoreSpec, pgVectorService,
-                DistanceStrategies.innerProduct(), true);
+                DistanceStrategies.innerProduct());
 
         Triple<String, String, SimilaritySearchQuery> queryData = prepareSimilaritySearchQuery();
         SimilaritySearchQuery query = queryData.getThird();
@@ -136,7 +137,7 @@ final class PGVectorStoreTest {
         pgVectorStore = new PGVectorStore(
                 embeddingProcessor,
                 pgVectorStoreSpec, pgVectorService,
-                DistanceStrategies.cosine(), true);
+                DistanceStrategies.cosine());
 
         Triple<String, String, SimilaritySearchQuery> queryData = prepareSimilaritySearchQuery();
         SimilaritySearchQuery query = queryData.getThird();
@@ -154,6 +155,30 @@ final class PGVectorStoreTest {
         assertThat(Math.abs(firstDocumentScore - TOP_VECTOR_VALUE)).isLessThan(Math.abs(secondDocumentScore - TOP_VECTOR_VALUE));
         assertThat(firstDocumentPageContent).isEqualTo(firstPageContent);
         assertThat(secondDocumentPageContent).isEqualTo(secondPageContent);
+    }
+
+    @Test
+    public void testUpdateDocuments() throws SQLException {
+        EmbeddingOutput embeddingOutput = EmbeddingOutput.of(EmbeddingType.OPEN_AI, getEmbeddings());
+        when(embeddingProcessor.run(ArgumentMatchers.any())).thenReturn(embeddingOutput);
+        when(pgVectorService.prepareStatement(ArgumentMatchers.any())).thenReturn(preparedStatement);
+        when(preparedStatement.executeUpdate()).thenReturn(DOCUMENT_COUNT, DOCUMENT_COUNT);
+
+        // Act.
+        boolean isSuccess = pgVectorStore.updateDocuments(getDocuments());
+        // Assert.
+        assertThat(isSuccess).isTrue();
+    }
+
+    @Test
+    public void testDeleteDocuments() throws SQLException {
+        List<DomainDocument> documents = getDocuments();
+        Mockito.when(pgVectorService.executeUpdate(ArgumentMatchers.any())).thenReturn(documents.size());
+
+        // Act.
+        boolean isSuccess = pgVectorStore.deleteDocuments(documents);
+        // Assert.
+        assertThat(isSuccess).isTrue();
     }
 
     private List<DomainDocument> getDocuments() {
